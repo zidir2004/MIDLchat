@@ -1,4 +1,4 @@
-package tp_tech;
+
 
 import java.awt.*;
 import javax.swing.*;

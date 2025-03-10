@@ -1,33 +1,56 @@
-package midlchat;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ChatUI {
     private JFrame frame;
     private JPanel contactsPanel, chatPanel, topPanel, bottomPanel;
     private JTextArea chatArea;
     private JTextField messageField, searchField;
-    private JButton sendButton, discussionsButton, groupsButton, profileButton;
+    private JButton sendButton, discussionsButton, groupsButton, profileButton, addFriendButton;
     private DefaultListModel<String> contactsModel;
     private JList<String> contactsList;
+    
+    private Connection connection;
+    private int selectedFriendId = -1; // ID de l'ami sélectionné
 
+    
+
+    private int currentUserId;
+    private String currentUserName;
+
+    public ChatUI(int userId, String userName) {
+        this.currentUserId = userId;
+        this.currentUserName = userName;
+
+        createAndShowGUI();
+    }
+    
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new ChatUI().createAndShowGUI());
+        SwingUtilities.invokeLater(() -> new ChatUI(1, "Test User"));
     }
 
+    
     public void createAndShowGUI() {
         frame = new JFrame("MIDL Chat");
+        JLabel welcomeLabel = new JLabel("Bienvenue " + currentUserName);
+        welcomeLabel.setForeground(Color.WHITE);
+        welcomeLabel.setFont(new Font("Poppins", Font.BOLD, 18));
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1000, 700); // Taille plus spacieuse
+        frame.setSize(1000, 700);
         frame.setLayout(new BorderLayout());
 
         // Palette de couleurs
-        Color backgroundColor = new Color(245, 245, 245); // Blanc cassé
-        Color mainColor = new Color(212, 165, 165); // Rose poudré
-        Color buttonColor = new Color(212, 165, 165); // Rose poudré
-        Color textColor = new Color(176, 176, 176); // Gris clair pour le texte
+        Color backgroundColor = new Color(245, 245, 245);
+        Color mainColor = new Color(212, 165, 165);
+        Color buttonColor = new Color(212, 165, 165);
+
+        // Connexion à la base de données
+        connectToDatabase();
 
         // Panel Haut (Barre de titre + Recherche + Bienvenue)
         topPanel = new JPanel(new BorderLayout());
@@ -38,41 +61,48 @@ public class ChatUI {
         titleLabel.setForeground(Color.WHITE);
         titleLabel.setFont(new Font("Poppins", Font.BOLD, 60));
 
-        searchField = new JTextField("Rechercher...");
+        searchField = new JTextField("Rechercher un utilisateur...");
         searchField.setPreferredSize(new Dimension(250, 40));
         searchField.setFont(new Font("Poppins", Font.PLAIN, 14));
 
-        JPanel welcomePanel = new JPanel();
-        welcomePanel.setBackground(mainColor);
-        JLabel welcomeLabel = new JLabel("Bienvenue Louiza");
-        welcomeLabel.setForeground(Color.WHITE);
-        welcomeLabel.setFont(new Font("Poppins", Font.BOLD, 18));
+        addFriendButton = new JButton("Ajouter Ami");
+        addFriendButton.setBackground(buttonColor);
+        addFriendButton.setForeground(Color.WHITE);
+        addFriendButton.setFont(new Font("Poppins", Font.BOLD, 14));
+        addFriendButton.setBorderPainted(false);
+        addFriendButton.setFocusPainted(false);
+        addFriendButton.addActionListener(e -> searchAndAddFriend());
 
-        JLabel profileIcon = new JLabel(new ImageIcon("profile_icon.png"));
-        profileIcon.setPreferredSize(new Dimension(40, 40));
-
-        welcomePanel.add(welcomeLabel);
-        welcomePanel.add(profileIcon);
+        JPanel searchPanel = new JPanel(new BorderLayout());
+        searchPanel.add(searchField, BorderLayout.CENTER);
+        searchPanel.add(addFriendButton, BorderLayout.EAST);
 
         topPanel.add(titleLabel, BorderLayout.WEST);
-        topPanel.add(searchField, BorderLayout.CENTER);
-        topPanel.add(welcomePanel, BorderLayout.EAST);
+        topPanel.add(searchPanel, BorderLayout.CENTER);
 
-        // Barre latérale (Liste des contacts avec avatars)
-        contactsPanel = new JPanel();
-        contactsPanel.setLayout(new BorderLayout());
+        // Barre latérale (Liste des amis)
+        contactsPanel = new JPanel(new BorderLayout());
         contactsPanel.setPreferredSize(new Dimension(300, 650));
         contactsPanel.setBackground(backgroundColor);
 
         contactsModel = new DefaultListModel<>();
-        contactsModel.addElement("🧑‍🦰 Louis");
-        contactsModel.addElement("👩‍🦱 Dorsaf");
-        contactsModel.addElement("👨‍🦱 Idir");
         contactsList = new JList<>(contactsModel);
         contactsList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         contactsList.setFont(new Font("Poppins", Font.PLAIN, 18));
         contactsList.setBackground(Color.WHITE);
+        contactsList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String selectedFriend = contactsList.getSelectedValue();
+                if (selectedFriend != null) {
+                    loadConversation(selectedFriend);
+                }
+            }
+        });
+
         contactsPanel.add(new JScrollPane(contactsList), BorderLayout.CENTER);
+
+        // Charger les amis
+        loadFriends();
 
         // Zone de Chat
         chatPanel = new JPanel(new BorderLayout());
@@ -103,29 +133,12 @@ public class ChatUI {
         sendButton.setFocusPainted(false);
         sendButton.setPreferredSize(new Dimension(140, 50));
 
-        sendButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                sendMessage();
-            }
-        });
+        
 
         inputPanel.add(messageField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
 
-        JPanel navPanel = new JPanel(new GridLayout(1, 3, 15, 15));
-        navPanel.setBackground(backgroundColor);
-
-        discussionsButton = createStyledButton("Discussions");
-        groupsButton = createStyledButton("Groupes");
-        profileButton = createStyledButton("Profil");
-
-        navPanel.add(discussionsButton);
-        navPanel.add(groupsButton);
-        navPanel.add(profileButton);
-
         bottomPanel.add(inputPanel, BorderLayout.NORTH);
-        bottomPanel.add(navPanel, BorderLayout.SOUTH);
 
         // Ajouter les composants à la fenêtre
         frame.add(topPanel, BorderLayout.NORTH);
@@ -136,25 +149,74 @@ public class ChatUI {
         frame.setVisible(true);
     }
 
-    private JButton createStyledButton(String text) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("Poppins", Font.BOLD, 16));
-        button.setBackground(new Color(212, 165, 165)); // Rose poudré
-        button.setForeground(Color.WHITE);
-        button.setBorderPainted(false);
-        button.setFocusPainted(false);
-        button.setPreferredSize(new Dimension(160, 60));
-        return button;
+    // Connexion à la base de données
+    private void connectToDatabase() {
+        try {
+            String url = "jdbc:mysql://localhost:3306/midlchat";
+            String user = "root";
+            String password = "";
+
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            connection = DriverManager.getConnection(url, user, password);
+            System.out.println("✅ Connexion à la base de données réussie !");
+        } catch (Exception e) {
+            System.err.println("❌ Erreur de connexion à la base de données !");
+            e.printStackTrace();
+        }
     }
 
-    private void sendMessage() {
-        String message = messageField.getText().trim();
-        if (!message.isEmpty()) {
-            chatArea.append("Moi: " + message + "\n");
-            messageField.setText("");
+    // Charger les amis
+    private void loadFriends() {
+        try {
+            String query = "SELECT u.nom FROM utilisateurs u JOIN amis a ON (u.id = a.utilisateur_id1 OR u.id = a.utilisateur_id2) WHERE (a.utilisateur_id1 = ? OR a.utilisateur_id2 = ?) AND a.statut = 'confirmé' AND u.id != ?";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setInt(1, currentUserId);
+            pstmt.setInt(2, currentUserId);
+            pstmt.setInt(3, currentUserId);
+
+            ResultSet rs = pstmt.executeQuery();
+            contactsModel.clear();
+            while (rs.next()) {
+                contactsModel.addElement(rs.getString("nom"));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Erreur lors du chargement des amis !");
+            e.printStackTrace();
+        }
+    }
+
+    // Charger la conversation avec un ami
+    private void loadConversation(String friendName) {
+        chatArea.setText("");  // Efface l'ancienne conversation
+        try {
+            String query = "SELECT contenu FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY timestamp";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setInt(1, currentUserId);
+            pstmt.setInt(2, selectedFriendId);
+            pstmt.setInt(3, selectedFriendId);
+            pstmt.setInt(4, currentUserId);
+
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                chatArea.append(rs.getString("contenu") + "\n");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Rechercher et ajouter un ami
+    private void searchAndAddFriend() {
+        String friendName = searchField.getText().trim();
+        try {
+            String query = "INSERT INTO amis (utilisateur_id1, utilisateur_id2, statut) VALUES (?, (SELECT id FROM utilisateurs WHERE nom = ?), 'en attente')";
+            PreparedStatement pstmt = connection.prepareStatement(query);
+            pstmt.setInt(1, currentUserId);
+            pstmt.setString(2, friendName);
+            pstmt.executeUpdate();
+            JOptionPane.showMessageDialog(frame, friendName + " a reçu une demande d'ami !");
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 }
-
-
-
