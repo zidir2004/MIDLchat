@@ -1,5 +1,3 @@
-
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -7,7 +5,7 @@ import java.awt.event.*;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
-import javax.sound.sampled.*;
+import javax.swing.Timer;
 
 public class ChatUI {
     private JFrame frame;
@@ -29,7 +27,7 @@ public class ChatUI {
         this.connection = DatabaseConnection.getConnection();
 
         frame = new JFrame("MIDL Chat - " + userName);
-        frame.setSize(800, 600);
+        frame.setSize(900, 600);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());
 
@@ -38,10 +36,10 @@ public class ChatUI {
         Color buttonColor = new Color(46, 204, 113);
         Color textColor = Color.WHITE;
 
-        // 🏷️ Entête
+        // 🏷️ En-tête
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(sidebarColor);
-        topPanel.setPreferredSize(new Dimension(800, 50));
+        topPanel.setPreferredSize(new Dimension(900, 50));
 
         JLabel titleLabel = new JLabel("Bienvenue, " + userName + " !");
         titleLabel.setForeground(textColor);
@@ -58,7 +56,9 @@ public class ChatUI {
             new AuthPage();
         });
 
-        // 📜 Liste des amis avec avatars
+        frame.add(topPanel, BorderLayout.NORTH);
+
+        // 📜 Liste des amis + Ajout d'amis
         JPanel friendsPanel = new JPanel(new BorderLayout());
         friendsPanel.setBackground(sidebarColor);
         friendsPanel.setPreferredSize(new Dimension(250, 600));
@@ -85,6 +85,15 @@ public class ChatUI {
 
         loadFriends(); // Charger la liste des amis
 
+        // 📧 Bouton pour ouvrir la gestion des demandes d'amis
+        JButton addFriendButton = new JButton("Ajouter un ami");
+        addFriendButton.setBackground(buttonColor);
+        addFriendButton.setForeground(Color.WHITE);
+        addFriendButton.addActionListener(e -> new FriendRequestsUI(currentUserId));
+
+        friendsPanel.add(addFriendButton, BorderLayout.SOUTH);
+        frame.add(friendsPanel, BorderLayout.WEST);
+
         // 💬 Zone de Chat
         JPanel chatPanel = new JPanel(new BorderLayout());
         chatPanel.setBackground(Color.WHITE);
@@ -95,11 +104,12 @@ public class ChatUI {
         chatArea.setBackground(Color.WHITE);
         JScrollPane scrollPane = new JScrollPane(chatArea);
         chatPanel.add(scrollPane, BorderLayout.CENTER);
+        frame.add(chatPanel, BorderLayout.CENTER);
 
         // ✍️ Zone d'Entrée et Bouton Envoyer
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setBackground(Color.LIGHT_GRAY);
-        bottomPanel.setPreferredSize(new Dimension(800, 50));
+        bottomPanel.setPreferredSize(new Dimension(900, 50));
 
         messageField = new JTextField();
         sendButton = new JButton("Envoyer");
@@ -109,11 +119,6 @@ public class ChatUI {
 
         bottomPanel.add(messageField, BorderLayout.CENTER);
         bottomPanel.add(sendButton, BorderLayout.EAST);
-
-        // 🏗️ Ajouter tout à la fenêtre
-        frame.add(topPanel, BorderLayout.NORTH);
-        frame.add(friendsPanel, BorderLayout.WEST);
-        frame.add(chatPanel, BorderLayout.CENTER);
         frame.add(bottomPanel, BorderLayout.SOUTH);
 
         frame.setVisible(true);
@@ -127,8 +132,7 @@ public class ChatUI {
         refreshTimer.start();
     }
 
-   
- // 🔄 Charger uniquement les amis confirmés
+    // 🔄 Charger uniquement les amis confirmés
     private void loadFriends() {
         try {
             String query = "SELECT u.id, u.nom FROM utilisateurs u " +
@@ -155,10 +159,9 @@ public class ChatUI {
         }
     }
 
-
     // 🔄 Charger la conversation avec un ami
     private void loadConversation(String friendName) {
-        chatArea.setText("");
+        chatArea.setText("");  // Efface les anciens messages
         selectedFriendId = friendIdMap.get(friendName);
 
         try {
@@ -175,8 +178,6 @@ public class ChatUI {
                 String sender = (senderId == currentUserId) ? "Moi" : friendName;
                 chatArea.append(sender + ": " + rs.getString("contenu") + "\n");
             }
-
-           
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -196,10 +197,12 @@ public class ChatUI {
 
                 chatArea.append("Moi: " + message + "\n");
                 messageField.setText("");
+
+                // Rafraîchir la conversation après l'envoi du message
+                loadConversation(friendsList.getSelectedValue());
             } catch (SQLException e) {
                 e.printStackTrace();
             }
         }
     }
-
 }
