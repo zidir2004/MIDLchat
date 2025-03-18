@@ -147,6 +147,7 @@ public class ChatUI {
 
         // 🔄 Rafraîchir le chat toutes les 2 secondes
         refreshTimer = new Timer(2000, e -> {
+        	loadFriends();
             if (selectedFriendId != -1) {
                 loadConversation(friendsList.getSelectedValue());
             }
